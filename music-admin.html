@@ -2,14 +2,14 @@
 <html lang="th">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
   <title>Music Remote Control</title>
   
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
 
   <style>
-    * { box-sizing: border-box; font-family: sans-serif; }
+    * { box-sizing: border-box; font-family: sans-serif; user-select: none; }
     body { background: #f8fafc; padding: 20px; margin: 0; color: #1e293b; }
     .container { max-width: 500px; margin: 0 auto; }
     h2 { text-align: center; color: #1e3a8a; }
@@ -19,7 +19,9 @@
     .btn-march { background: #0284c7; }
     .btn-pray { background: #7c3aed; }
     .btn-stop { background: #dc2626; margin-top: 10px; }
-    .btn-sound:active { opacity: 0.8; }
+    .btn-mic { background: #ef4444; padding: 22px; font-size: 18px; border-radius: 12px; transition: 0.1s; touch-action: manipulation; }
+    .btn-mic:active, .btn-mic.talking { background: #b91c1c; transform: scale(0.98); box-shadow: inset 0 3px 8px rgba(0,0,0,0.4); }
+    .mic-status { text-align: center; font-weight: bold; margin-top: 5px; color: #64748b; font-size: 14px; }
   </style>
 </head>
 <body>
@@ -27,6 +29,15 @@
 <div class="container">
   <h2>📱 รีโมทสั่งเปิดเสียงตามสาย</h2>
 
+  <!-- ส่วนประกาศเสียงสด -->
+  <div class="card">
+    <button id="btnTalk" class="btn-sound btn-mic" onmousedown="startTalk()" onmouseup="stopTalk()" ontouchstart="startTalk(event)" ontouchend="stopTalk(event)">
+      🎙️ กดค้างไว้เพื่อพูดประกาศสด
+    </button>
+    <div id="micStatus" class="mic-status">พร้อมใช้งาน (กดค้าง = พูด / ปล่อย = หยุด)</div>
+  </div>
+
+  <!-- ส่วนปุ่มเล่นไฟล์ MP3 -->
   <div class="card">
     <button class="btn-sound btn-national" onclick="playMusic('เพลงชาติไทย', 'https://thananate.github.io/wongpraram-app/01_thai.mp3')">
       🇹🇭 เล่นเพลงชาติ
@@ -43,7 +54,7 @@
     <hr style="border: 0; border-top: 1px solid #e2e8f0; margin: 15px 0;">
 
     <button class="btn-sound btn-stop" onclick="stopMusic()">
-      ⏹️ กดหยุดเสียงทันที
+      ⏹️ กดหยุดเสียงทุกอย่าง
     </button>
   </div>
 </div>
@@ -61,14 +72,101 @@
   firebase.initializeApp(firebaseConfig);
   const db = firebase.firestore();
 
+  let localStream = null;
+  let peerConnection = null;
+  let isTalking = false;
+  const rtcConfig = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] };
+
+  async function startTalk(e) {
+    if (e) e.preventDefault();
+    if (isTalking) return;
+    isTalking = true;
+
+    document.getElementById("btnTalk").classList.add("talking");
+    document.getElementById("micStatus").innerText = "🔴 กำลังส่งเสียงพูดสด...";
+    document.getElementById("micStatus").style.color = "#ef4444";
+
+    try {
+      localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+      peerConnection = new RTCPeerConnection(rtcConfig);
+
+      localStream.getTracks().forEach((track) => {
+        peerConnection.addTrack(track, localStream);
+      });
+
+      const callDoc = db.collection("webrtc_calls").doc("live");
+      const offerCandidates = callDoc.collection("offerCandidates");
+      const answerCandidates = callDoc.collection("answerCandidates");
+
+      // ล้างข้อมูลการโทรเก่า
+      await callDoc.delete().catch(() => {});
+
+      peerConnection.onicecandidate = (event) => {
+        if (event.candidate) {
+          offerCandidates.add(event.candidate.toJSON());
+        }
+      };
+
+      const offerDescription = await peerConnection.createOffer();
+      await peerConnection.setLocalDescription(offerDescription);
+
+      const offer = {
+        sdp: offerDescription.sdp,
+        type: offerDescription.type,
+      };
+
+      await callDoc.set({ offer });
+
+      callDoc.onSnapshot((snapshot) => {
+        const data = snapshot.data();
+        if (peerConnection && !peerConnection.currentRemoteDescription && data?.answer) {
+          const answerDescription = new RTCSessionDescription(data.answer);
+          peerConnection.setRemoteDescription(answerDescription);
+        }
+      });
+
+      answerCandidates.onSnapshot((snapshot) => {
+        snapshot.docChanges().forEach((change) => {
+          if (change.type === "added") {
+            let data = change.doc.data();
+            peerConnection.addIceCandidate(new RTCIceCandidate(data));
+          }
+        });
+      });
+
+    } catch (err) {
+      alert("❌ ไม่สามารถเปิดใช้งานไมโครโฟนได้: " + err.message);
+      stopTalk();
+    }
+  }
+
+  async function stopTalk(e) {
+    if (e) e.preventDefault();
+    if (!isTalking) return;
+    isTalking = false;
+
+    document.getElementById("btnTalk").classList.remove("talking");
+    document.getElementById("micStatus").innerText = "พร้อมใช้งาน (กดค้าง = พูด / ปล่อย = หยุด)";
+    document.getElementById("micStatus").style.color = "#64748b";
+
+    if (localStream) {
+      localStream.getTracks().forEach(track => track.stop());
+    }
+    if (peerConnection) {
+      peerConnection.close();
+      peerConnection = null;
+    }
+
+    const callDoc = db.collection("webrtc_calls").doc("live");
+    await callDoc.delete().catch(() => {});
+  }
+
   function playMusic(title, url) {
     db.collection("sound_control").doc("current").set({
       action: "PLAY",
       title: title,
       url: url,
       timestamp: firebase.firestore.FieldValue.serverTimestamp()
-    }).then(() => {
-      alert("สั่งเปิด: " + title + " เรียบร้อย!");
     });
   }
 
@@ -76,8 +174,6 @@
     db.collection("sound_control").doc("current").set({
       action: "STOP",
       timestamp: firebase.firestore.FieldValue.serverTimestamp()
-    }).then(() => {
-      alert("สั่งหยุดเสียงเรียบร้อย!");
     });
   }
 </script>
