@@ -49,19 +49,19 @@
       <!-- ตัวเลือกรายวัน -->
       <div class="filter-group">
         <label for="filterDate"><b>เลือกวัน:</b></label>
-        <input type="date" id="filterDate">
-        <button class="btn-export-day" onclick="loadAndExport('day')">📥 ออกรายงานรายวัน</button>
+        <input type="date" id="filterDate" onchange="fetchData('day')">
+        <button class="btn-export-day" onclick="exportToExcel('day')">📥 ออกรายงานรายวัน</button>
       </div>
 
       <!-- ตัวเลือกรายเดือน -->
       <div class="filter-group">
         <label for="filterMonth"><b>เลือกเดือน:</b></label>
-        <input type="month" id="filterMonth">
-        <button class="btn-export-month" onclick="loadAndExport('month')">📥 ออกรายงานรายเดือน</button>
+        <input type="month" id="filterMonth" onchange="fetchData('month')">
+        <button class="btn-export-month" onclick="exportToExcel('month')">📥 ออกรายงานรายเดือน</button>
       </div>
     </div>
     
-    <div id="modeStatus" class="mode-title" style="text-align: center;">แสดงข้อมูล: รายวัน</div>
+    <div id="modeStatus" class="mode-title" style="text-align: center;">กำลังเตรียมข้อมูล...</div>
   </div>
 
   <div class="table-responsive">
@@ -100,8 +100,9 @@
   firebase.initializeApp(firebaseConfig);
   const db = firebase.firestore();
 
-  let currentData = [];
-  let currentMode = 'day'; // 'day' หรือ 'month'
+  let allRawData = []; // เก็บข้อมูลทั้งหมดไว้ในเครื่อง
+  let currentFilteredData = []; // เก็บข้อมูลที่กรองแล้ว
+  let activeMode = 'day';
 
   window.onload = function() {
     const today = new Date();
@@ -112,21 +113,81 @@
     document.getElementById("filterDate").value = todayStr;
     document.getElementById("filterMonth").value = `${year}-${month}`;
 
-    // โหลดข้อมูลรายวันเป็นค่าเริ่มต้น
-    fetchData('day');
+    // ดึงข้อมูลทั้งหมดแบบเรียลไทม์ครั้งเดียว
+    db.collection("attendance").onSnapshot((querySnapshot) => {
+      allRawData = [];
+      querySnapshot.forEach((doc) => {
+        allRawData.push(doc.data());
+      });
+
+      // เรียงลำดับจากวันที่ล่าสุดไปเก่าสุด
+      allRawData.sort((a, b) => (a.date > b.date) ? -1 : 1);
+
+      // แสดงผลข้อมูลตามโหมดปัจจุบัน
+      fetchData(activeMode);
+    }, (err) => {
+      document.getElementById("tableBody").innerHTML = `<tr><td colspan="9" style="text-align:center; color:red; padding: 30px;">เกิดข้อผิดพลาด: ${err.message}</td></tr>`;
+    });
   };
 
-  // เปลี่ยนวันที่ในช่องเพื่อโหลดข้อมูลตาราง
-  document.getElementById("filterDate").addEventListener("change", () => fetchData('day'));
-  document.getElementById("filterMonth").addEventListener("change", () => fetchData('month'));
-
   function fetchData(mode) {
-    currentMode = mode;
+    activeMode = mode;
     const tbody = document.getElementById("tableBody");
-    tbody.innerHTML = '<tr><td colspan="9" style="text-align:center; padding: 30px;">กำลังโหลดข้อมูล...</td></tr>';
+    currentFilteredData = [];
 
-    let query = db.collection("attendance");
+    if (allRawData.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="9" style="text-align:center; padding: 30px; color:#94a3b8;">ไม่พบข้อมูลในระบบ</td></tr>';
+      return;
+    }
 
     if (mode === 'day') {
       const selectedDate = document.getElementById("filterDate").value;
-      document.getElementById
+      document.getElementById("modeStatus").innerText = `📌 แสดงข้อมูลรายวันประจำวันที่: ${selectedDate}`; currentFilteredData = allRawData.filter(item => item.date === selectedDate); } else { const selectedMonth = document.getElementById("filterMonth").value; // รูปแบบ "YYYY-MM" document.getElementById("modeStatus").innerText = `📅 แสดงข้อมูลรายเดือนประจำเดือน: ${selectedMonth}`;
+      currentFilteredData = allRawData.filter(item => item.date && item.date.startsWith(selectedMonth));
+    }
+
+    renderTable(currentFilteredData);
+  }
+
+  function renderTable(dataList) {
+    const tbody = document.getElementById("tableBody");
+    tbody.innerHTML = "";
+
+    if (dataList.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="9" style="text-align:center; padding: 30px; color:#94a3b8;">ไม่พบข้อมูลตามช่วงเวลาที่เลือก</td></tr>';
+      return;
+    }
+
+    dataList.forEach((data) => {
+      let mapHtml = "ไม่ระบุ";
+      if (data.mapUrl) {
+        mapHtml = `<a class="map-link" href="${data.mapUrl}" target="_blank">📍 ดูแผนที่</a>`;
+      } else if (data.lat && data.lng && data.lat !== 0) {
+        mapHtml = `<a class="map-link" href="https://maps.google.com/?q=${data.lat},${data.lng}" target="_blank">📍 ดูแผนที่</a>`;
+      }
+
+      const tr = document.createElement("tr");
+      tr.innerHTML = `
+        <td><b>${data.date || '-'}</b></td>
+        <td>${data.empName || '-'}</td>
+        <td>${data.inMorning || '--:--'}</td>
+        <td>${data.outNoon || '--:--'}</td>
+        <td>${data.inAfternoon || '--:--'}</td>
+        <td>${data.outEvening || '--:--'}</td>
+        <td>${data.inOT || '--:--'}</td>
+        <td>${data.outOT || '--:--'}</td>
+        <td>${mapHtml}</td>
+      `;
+      tbody.appendChild(tr);
+    });
+  }
+
+  function exportToExcel(mode) {
+    if (currentFilteredData.length === 0) {
+      alert("ไม่มีข้อมูลตามช่วงเวลาที่เลือกให้ดาวน์โหลดครับ");
+      return;
+    }
+
+    const filename = mode === 'day' 
+      ? `รายงานลงเวลา_รายวัน_${document.getElementById("filterDate").value}.xlsx`
+      : `รายงาน
