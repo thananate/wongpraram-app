@@ -16,21 +16,27 @@
     * { box-sizing: border-box; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
     body { background-color: #f8fafc; padding: 20px; margin: 0; color: #334155; }
     .container { max-width: 1200px; margin: 0 auto; }
-    .header { display: flex; justify-content: space-between; align-items: center; background: white; padding: 20px; border-radius: 12px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); margin-bottom: 20px; flex-wrap: wrap; gap: 15px; }
-    h2 { margin: 0; color: #1e3a8a; }
-    .controls { display: flex; gap: 10px; align-items: center; }
-    input[type="date"] { padding: 10px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 15px; }
-    .btn-export { background-color: #16a34a; color: white; border: none; padding: 10px 18px; font-weight: bold; border-radius: 8px; cursor: pointer; transition: 0.2s; display: flex; align-items: center; gap: 6px; }
-    .btn-export:hover { background-color: #15803d; }
+    .header { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); margin-bottom: 20px; }
+    h2 { margin: 0 0 15px 0; color: #1e3a8a; text-align: center; }
+    
+    .filter-card { display: flex; flex-wrap: wrap; gap: 20px; justify-content: space-around; background: #f1f5f9; padding: 15px; border-radius: 10px; margin-bottom: 15px; }
+    .filter-group { display: flex; align-items: center; gap: 8px; }
+    input[type="date"], input[type="month"] { padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 14px; font-weight: bold; }
+    
+    .btn-export-day { background-color: #0284c7; color: white; border: none; padding: 8px 14px; font-weight: bold; border-radius: 6px; cursor: pointer; transition: 0.2s; }
+    .btn-export-day:hover { background-color: #0369a1; }
+    
+    .btn-export-month { background-color: #16a34a; color: white; border: none; padding: 8px 14px; font-weight: bold; border-radius: 6px; cursor: pointer; transition: 0.2s; }
+    .btn-export-month:hover { background-color: #15803d; }
     
     .table-responsive { background: white; border-radius: 12px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); overflow-x: auto; }
     table { width: 100%; border-collapse: collapse; text-align: left; min-width: 900px; }
     th, td { padding: 14px 16px; border-bottom: 1px solid #e2e8f0; font-size: 14px; }
-    th { background-color: #f1f5f9; color: #475569; font-weight: 600; white-space: nowrap; }
-    tr:hover { background-color: #f8fafc; }
-    .badge { padding: 4px 8px; border-radius: 6px; font-size: 12px; font-weight: bold; background: #e2e8f0; }
+    th { background-color: #f8fafc; color: #475569; font-weight: 600; white-space: nowrap; }
+    tr:hover { background-color: #f1f5f9; }
     .map-link { color: #2563eb; text-decoration: none; font-weight: bold; }
     .map-link:hover { text-decoration: underline; }
+    .mode-title { font-weight: bold; color: #1e40af; margin-bottom: 10px; }
   </style>
 </head>
 <body>
@@ -38,19 +44,32 @@
 <div class="container">
   <div class="header">
     <h2>📊 รายงานลงเวลาพนักงาน (Admin)</h2>
-    <div class="controls">
-      <label for="filterDate"><b>เลือกวันที่:</b> </label>
-      <input type="date" id="filterDate" onchange="loadData()">
-      <button class="btn-export" onclick="exportToExcel()">📥 ดาวน์โหลด Excel</button>
+    
+    <div class="filter-card">
+      <!-- ตัวเลือกรายวัน -->
+      <div class="filter-group">
+        <label for="filterDate"><b>เลือกวัน:</b></label>
+        <input type="date" id="filterDate">
+        <button class="btn-export-day" onclick="loadAndExport('day')">📥 ออกรายงานรายวัน</button>
+      </div>
+
+      <!-- ตัวเลือกรายเดือน -->
+      <div class="filter-group">
+        <label for="filterMonth"><b>เลือกเดือน:</b></label>
+        <input type="month" id="filterMonth">
+        <button class="btn-export-month" onclick="loadAndExport('month')">📥 ออกรายงานรายเดือน</button>
+      </div>
     </div>
+    
+    <div id="modeStatus" class="mode-title" style="text-align: center;">แสดงข้อมูล: รายวัน</div>
   </div>
 
   <div class="table-responsive">
     <table id="attendanceTable">
       <thead>
         <tr>
-          <th>ชื่อพนักงาน</th>
           <th>วันที่</th>
+          <th>ชื่อพนักงาน</th>
           <th>เข้าเช้า (D)</th>
           <th>ออกเที่ยง (E)</th>
           <th>เข้าบ่าย (F)</th>
@@ -81,94 +100,33 @@
   firebase.initializeApp(firebaseConfig);
   const db = firebase.firestore();
 
-  let currentData = []; // เก็บข้อมูลสำหรับ Export Excel
+  let currentData = [];
+  let currentMode = 'day'; // 'day' หรือ 'month'
 
-  // ตั้งค่าวันที่เริ่มต้นเป็นวันนี้
   window.onload = function() {
-    const today = new Date().toISOString().split('T')[0];
-    document.getElementById("filterDate").value = today;
-    loadData();
+    const today = new Date();
+    const todayStr = today.toISOString().split('T')[0];
+    const year = today.getFullYear();
+    const month = String(today.getMonth() + 1).padStart(2, '0');
+
+    document.getElementById("filterDate").value = todayStr;
+    document.getElementById("filterMonth").value = `${year}-${month}`;
+
+    // โหลดข้อมูลรายวันเป็นค่าเริ่มต้น
+    fetchData('day');
   };
 
-  // ดึงข้อมูลจาก Firestore ตามวันที่เลือก
-  function loadData() {
-    const selectedDate = document.getElementById("filterDate").value;
+  // เปลี่ยนวันที่ในช่องเพื่อโหลดข้อมูลตาราง
+  document.getElementById("filterDate").addEventListener("change", () => fetchData('day'));
+  document.getElementById("filterMonth").addEventListener("change", () => fetchData('month'));
+
+  function fetchData(mode) {
+    currentMode = mode;
     const tbody = document.getElementById("tableBody");
     tbody.innerHTML = '<tr><td colspan="9" style="text-align:center; padding: 30px;">กำลังโหลดข้อมูล...</td></tr>';
-    
-    currentData = [];
 
-    db.collection("attendance")
-      .where("date", "==", selectedDate)
-      .onSnapshot((querySnapshot) => {
-        tbody.innerHTML = "";
-        currentData = [];
+    let query = db.collection("attendance");
 
-        if (querySnapshot.empty) {
-          tbody.innerHTML = '<tr><td colspan="9" style="text-align:center; padding: 30px; color:#94a3b8;">ไม่พบข้อมูลการลงเวลาในวันนี้</td></tr>';
-          return;
-        }
-
-        querySnapshot.forEach((doc) => {
-          const data = doc.data();
-          currentData.push(data);
-
-          let mapHtml = "ไม่ระบุ";
-          if (data.lat && data.lng && data.lat !== 0) {
-            mapHtml = `<a class="map-link" href="https://maps.google.com/?q=${data.lat},${data.lng}" target="_blank">📍 ดูแผนที่</a>`;
-          }
-
-          const tr = document.createElement("tr");
-          tr.innerHTML = `
-            <td><b>${data.empName || '-'}</b></td>
-            <td>${data.date || '-'}</td>
-            <td>${data.inMorning || '--:--'}</td>
-            <td>${data.outNoon || '--:--'}</td>
-            <td>${data.inAfternoon || '--:--'}</td>
-            <td>${data.outEvening || '--:--'}</td>
-            <td>${data.inOT || '--:--'}</td>
-            <td>${data.outOT || '--:--'}</td>
-            <td>${mapHtml}</td>
-          `;
-          tbody.appendChild(tr);
-        });
-      }, (err) => {
-        tbody.innerHTML = `<tr><td colspan="9" style="text-align:center; color:red; padding: 30px;">เกิดข้อผิดพลาด: ${err.message}</td></tr>`;
-      });
-  }
-
-  // ฟังก์ชันดาวน์โหลดเป็นไฟล์ Excel (.xlsx)
-  function exportToExcel() {
-    if (currentData.length === 0) {
-      alert("ไม่มีข้อมูลให้ดาวน์โหลดครับ");
-      return;
-    }
-
-    const selectedDate = document.getElementById("filterDate").value;
-    
-    // แปลงโครงสร้างข้อมูลให้สวยงามสำหรับ Excel
-    const excelRows = currentData.map(item => ({
-      "ชื่อพนักงาน": item.empName || "",
-      "วันที่": item.date || "",
-      "เข้าเช้า (D)": item.inMorning || "--:--",
-      "ออกเที่ยง (E)": item.outNoon || "--:--",
-      "เข้าบ่าย (F)": item.inAfternoon || "--:--",
-      "ออกบ่าย (G)": item.outEvening || "--:--",
-      "เข้า OT (H)": item.inOT || "--:--",
-      "ออก OT (I)": item.outOT || "--:--",
-      "Latitude": item.lat || 0,
-      "Longitude": item.lng || 0
-    }));
-
-    // สร้างไฟล์ Excel
-    const worksheet = XLSX.utils.json_to_sheet(excelRows);
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, "Report");
-
-    // โหลดไฟล์ออกสู่คอมพิวเตอร์
-    XLSX.writeFile(workbook, `รายงานลงเวลา_${selectedDate}.xlsx`);
-  }
-</script>
-
-</body>
-</html>
+    if (mode === 'day') {
+      const selectedDate = document.getElementById("filterDate").value;
+      document.getElementById
