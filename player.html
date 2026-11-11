@@ -14,7 +14,6 @@
     .btn-ready { background: #22c55e; color: white; border: none; padding: 16px 32px; font-size: 18px; font-weight: bold; border-radius: 10px; cursor: pointer; margin-bottom: 20px; transition: 0.2s; width: 100%; }
     .btn-ready:hover { background: #16a34a; }
     .now-playing { font-size: 20px; color: #38bdf8; font-weight: bold; margin-top: 15px; word-break: break-all; }
-    .error-log { color: #f87171; font-size: 14px; margin-top: 15px; background: rgba(239, 68, 68, 0.1); padding: 10px; border-radius: 8px; }
   </style>
 </head>
 <body>
@@ -27,9 +26,9 @@
   
   <div id="statusText" style="color: #e2e8f0; font-weight: bold;">⏳ รอปลดล็อกระบบเสียง...</div>
   <div id="nowPlaying" class="now-playing">--- สถาวะ: ปิดเสียง ---</div>
-  <div id="errorLog" class="error-log" style="display: none;"></div>
 
-  <audio id="audioPlayer" preload="auto"></audio>
+  <!-- ปลดล็อก CORS ออกเพื่อให้เล่นไฟล์ MP3 ได้ทุกกรณี -->
+  <audio id="audioPlayer"></audio>
 </div>
 
 <script>
@@ -55,48 +54,28 @@
     document.getElementById("statusText").style.color = "#4ade80";
   }
 
-  // แจ้งเตือนกรณีไฟล์เพลงมีปัญหา
-  audio.onerror = function() {
-    if (audio.src) {
-      showError("❌ ไม่สามารถโหลดไฟล์ MP3 ได้ (เช็กลิงก์ไฟล์เพลงอีกครั้ง)");
-    }
-  };
-
-  function showError(msg) {
-    const errDiv = document.getElementById("errorLog");
-    errDiv.innerText = msg;
-    errDiv.style.display = "block";
-  }
-
-  function hideError() {
-    document.getElementById("errorLog").style.display = "none";
-  }
-
   db.collection("sound_control").doc("current").onSnapshot((doc) => {
     if (!doc.exists) return;
     
     const data = doc.data();
-    hideError();
 
     if (data.action === "PLAY") {
-      document.getElementById("nowPlaying").innerText = "🎶 รับคำสั่ง: " + (data.title || "กำลังเล่น...");
-
-      if (!isAudioEnabled) {
-        showError("⚠️ กรุณากดปุ่มสีเขียวด้านบนก่อน 1 ครั้ง เพื่ออนุญาตให้เว็บเล่นเสียงครับ");
-        return;
-      }
+      document.getElementById("nowPlaying").innerText = "🎶 กำลังโหลด: " + (data.title || "");
 
       if (data.url) {
+        // บังคับเปลี่ยน source และสั่งเล่นใหม่ทันที
         audio.src = data.url;
         audio.load();
         
-        let playPromise = audio.play();
-        if (playPromise !== undefined) {
-          playPromise.then(() => {
-            document.getElementById("nowPlaying").innerText = "🔊 กำลังเล่น: " + data.title;
-          }).catch(error => {
-            showError("⚠️ เบราว์เซอร์ระงับเสียง: " + error.message);
-          });
+        if (isAudioEnabled) {
+          var playPromise = audio.play();
+          if (playPromise !== undefined) {
+            playPromise.then(function() {
+              document.getElementById("nowPlaying").innerText = "🔊 กำลังเล่น: " + data.title;
+            }).catch(function(err) {
+              console.log("Play error: ", err);
+            });
+          }
         }
       }
     } else if (data.action === "STOP") {
