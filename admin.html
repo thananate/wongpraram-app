@@ -1,165 +1,32 @@
 <!DOCTYPE html>
-<html>
+<html lang="th">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>WONGPHRARAM DIGITAL</title>
-  
-  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Admin Dashboard - WONGPHRARAM DIGITAL</title>
+  
+  <!-- Firebase SDK -->
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+  
+  <!-- Library สำหรับ Export ไฟล์ Excel (.xlsx) -->
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 
-  <style>
-    * { box-sizing: border-box; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
-    body { background-color: #f3f4f6; margin: 0; padding: 15px; display: flex; justify-content: center; }
-    .card { background: white; width: 100%; max-width: 450px; border-radius: 16px; padding: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
-    h2 { text-align: center; color: #1e40af; margin-top: 0; }
-    .form-group { margin-bottom: 15px; }
-    label { font-weight: bold; display: block; margin-bottom: 5px; color: #374151; }
-    input[type="text"] { width: 100%; padding: 12px; border: 1px solid #d1d5db; border-radius: 8px; font-size: 16px; }
-    .btn-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 15px; }
-    button { padding: 14px; font-size: 16px; font-weight: bold; border: none; border-radius: 8px; cursor: pointer; transition: 0.2s; color: white; }
-    button:disabled { opacity: 0.5; cursor: not-allowed; }
-    .btn-in { background-color: #16a34a; }
-    .btn-out { background-color: #dc2626; }
-    .time-board { background: #eff6ff; padding: 12px; border-radius: 8px; margin-top: 15px; }
-    .time-row { display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px dashed #cbd5e1; }
-    .time-row:last-child { border-bottom: none; }
-  </style>
-</head>
-<body>
-
-<div class="card">
-  <h2>ลงเวลาทำงาน (WONGPHRARAM)</h2>
-  
-  <div class="form-group">
-    <label for="empName">ชื่อพนักงาน:</label>
-    <input type="text" id="empName" placeholder="กรอกชื่อ-นามสกุล">
-  </div>
-
-  <div class="btn-grid">
-    <button type="button" id="btnIn" class="btn-in" onclick="sendData('IN')">บันทึกเข้างาน</button>
-    <button type="button" id="btnOut" class="btn-out" onclick="sendData('OUT')">บันทึกออกงาน</button>
-  </div>
-
-  <div class="time-board">
-    <div style="font-weight:bold; margin-bottom:8px; color:#1d4ed8;">เวลาบันทึกวันนี้:</div>
-    <div class="time-row"><span>เข้าเช้า (D):</span> <b id="tD">--:--</b></div>
-    <div class="time-row"><span>ออกเที่ยง (E):</span> <b id="tE">--:--</b></div>
-    <div class="time-row"><span>เข้าบ่าย (F):</span> <b id="tF">--:--</b></div>
-    <div class="time-row"><span>ออกบ่าย (G):</span> <b id="tG">--:--</b></div>
-    <div class="time-row"><span>เข้า OT (H):</span> <b id="tH">--:--</b></div>
-    <div class="time-row"><span>ออก OT (I):</span> <b id="tI">--:--</b></div>
-    <div style="text-align: center; margin-top: 15px;">
-  <a href="admin.html" style="color: #6b7280; text-decoration: none; font-size: 13px;">🔑 สำหรับผู้ดูแลระบบ (Admin)</a>
-    </div>
-    </div>
-</div>
-
-<script>
-  const firebaseConfig = {
-    apiKey: "AIzaSyActwKRKdMCIRo79apLXwwsw8zuHPCg9ag",
-    authDomain: "wongpraram-v8.firebaseapp.com",
-    projectId: "wongpraram-v8",
-    storageBucket: "wongpraram-v8.firebasestorage.app",
-    messagingSenderId: "406006018362",
-    appId: "1:406006018362:web:7c5d7f99fccda593e56003",
-    measurementId: "G-5D1SF6VPIN"
-  };
-
-  firebase.initializeApp(firebaseConfig);
-  const db = firebase.firestore();
-
-  let deviceId = localStorage.getItem("deviceId");
-  if (!deviceId) {
-    deviceId = "DEV-" + Math.floor(Math.random() * 1000000);
-    localStorage.setItem("deviceId", deviceId);
-  }
-
-  const todayStr = new Date().toISOString().split('T')[0];
-  const docId = todayStr + "_" + deviceId;
-
-  window.onload = function() {
-    let lastName = localStorage.getItem("lastEmpName") || "";
-    if (lastName) document.getElementById("empName").value = lastName;
-
-    db.collection("attendance").doc(docId).onSnapshot(function(doc) {
-      if (doc.exists) {
-        const data = doc.data();
-        if (data.empName) document.getElementById("empName").value = data.empName;
-        document.getElementById("tD").innerText = data.inMorning || "--:--";
-        document.getElementById("tE").innerText = data.outNoon || "--:--";
-        document.getElementById("tF").innerText = data.inAfternoon || "--:--";
-        document.getElementById("tG").innerText = data.outEvening || "--:--";
-        document.getElementById("tH").innerText = data.inOT || "--:--";
-        document.getElementById("tI").innerText = data.outOT || "--:--";
-      }
-    });
-  };
-
-  function sendData(type) {
-    var nameInput = document.getElementById("empName").value.trim();
-    if (!nameInput) {
-      alert("กรุณากรอกชื่อก่อนกดบันทึกครับ");
-      return;
-    }
-    localStorage.setItem("lastEmpName", nameInput);
-    toggleButtons(true);
-
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        function(pos) { doRecord(type, pos.coords.latitude, pos.coords.longitude); },
-        function(err) { doRecord(type, 0, 0); },
-        { timeout: 3000 }
-      );
-    } else {
-      doRecord(type, 0, 0);
-    }
-  }
-
-  function doRecord(type, lat, lng) {
-    const name = document.getElementById("empName").value.trim();
-    const now = new Date();
-    const hour = now.getHours() + (now.getMinutes() / 60);
-    const timeStr = now.toTimeString().substring(0, 5);
-
-    let updateData = { 
-      empName: name, 
-      deviceId: deviceId, 
-      date: todayStr,
-      updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-    };
-
-    if (lat !== 0 && lng !== 0) {
-      updateData.lat = lat;
-      updateData.lng = lng;
-    }
-
-    if (type === 'IN') {
-      if (hour < 12) updateData.inMorning = timeStr;
-      else if (hour < 16) updateData.inAfternoon = timeStr;
-      else updateData.inOT = timeStr;
-    } else {
-      if (hour < 13.5) updateData.outNoon = timeStr;
-      else if (hour < 18.5) updateData.outEvening = timeStr;
-      else updateData.outOT = timeStr;
-    }
-
-    db.collection("attendance").doc(docId).set(updateData, { merge: true })
-      .then(function() {
-        toggleButtons(false);
-        alert("บันทึกสำเร็จ!");
-      })
-      .catch(function(err) {
-        toggleButtons(false);
-        alert("เกิดข้อผิดพลาด: " + err.message);
-      });
-  }
-
-  function toggleButtons(disabled) {
-    document.getElementById("btnIn").disabled = disabled;
-    document.getElementById("btnOut").disabled = disabled;
-  }
-</script>
-
-</body>
-</html>
+  <style>
+    * { box-sizing: border-box; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+    body { background-color: #f8fafc; padding: 20px; margin: 0; color: #334155; }
+    .container { max-width: 1200px; margin: 0 auto; }
+    .header { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); margin-bottom: 20px; }
+    h2 { margin: 0 0 15px 0; color: #1e3a8a; text-align: center; }
+    
+    .filter-card { display: flex; gap: 15px; justify-content: center; align-items: center; background: #f1f5f9; padding: 15px; border-radius: 10px; margin-bottom: 15px; flex-wrap: wrap; }
+    input[type="month"] { padding: 10px 14px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 15px; font-weight: bold; color: #1e293b; }
+    
+    .btn-export-month { background-color: #16a34a; color: white; border: none; padding: 10px 20px; font-size: 15px; font-weight: bold; border-radius: 8px; cursor: pointer; transition: 0.2s; display: flex; align-items: center; gap: 6px; }
+    .btn-export-month:hover { background-color: #15803d; }
+    
+    .table-responsive { background: white; border-radius: 12px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; text-align: left; min-width: 900px; }
+    th, td { padding: 14px 16px; border-bottom: 1px solid #e2e8f0; font-size: 14px; }
+    th { background-color: #f8fafc; color: #475569; font-weight: 600; white-space: nowrap; }
+    tr:hover { background-color: #f1f5f9; }
