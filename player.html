@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Sound System Player (เครื่องเล่นเสียง)</title>
+  
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+
+  <style>
+    body { font-family: sans-serif; background: #0f172a; color: white; text-align: center; padding: 40px 20px; }
+    .status-box { background: #1e293b; border-radius: 12px; padding: 30px; max-width: 500px; margin: 0 auto; box-shadow: 0 4px 20px rgba(0,0,0,0.4); }
+    .btn-ready { background: #22c55e; color: white; border: none; padding: 15px 30px; font-size: 18px; font-weight: bold; border-radius: 8px; cursor: pointer; margin-bottom: 20px; }
+    .now-playing { font-size: 20px; color: #38bdf8; font-weight: bold; margin-top: 15px; }
+  </style>
+</head>
+<body>
+
+<div class="status-box">
+  <h2>🔊 เครื่องกระจายเสียง (Public Address Player)</h2>
+  <p style="color: #94a3b8;">เปิดหน้านี้ทิ้งไว้บนเครื่องคอมพิวเตอร์ที่ต่อระบบเสียงตามสาย</p>
+  
+  <!-- เบราว์เซอร์บังคับให้ต้องกดปุ่ม 1 ครั้งก่อน ถึงจะยอมให้เล่นเสียงอัตโนมัติได้ -->
+  <button id="btnInit" class="btn-ready" onclick="enableAudio()">คลิกที่นี่ 1 ครั้ง เพื่อเปิดระบบเสียง</button>
+  
+  <div id="statusText" style="color: #e2e8f0;">รอรับคำสั่งจากรีโมท...</div>
+  <div id="nowPlaying" class="now-playing">--- สถาวะ: ปิดเสียง ---</div>
+
+  <!-- ตัวเล่นเสียง HTML5 (ซ่อนไว้) -->
+  <audio id="audioPlayer" crossorigin="anonymous"></audio>
+</div>
+
+<script>
+  const firebaseConfig = {
+    apiKey: "AIzaSyActwKRKdMCIRo79apLXwwsw8zuHPCg9ag",
+    authDomain: "wongpraram-v8.firebaseapp.com",
+    projectId: "wongpraram-v8",
+    storageBucket: "wongpraram-v8.firebasestorage.app",
+    messagingSenderId: "406006018362",
+    appId: "1:406006018362:web:7c5d7f99fccda593e56003"
+  };
+
+  firebase.initializeApp(firebaseConfig);
+  const db = firebase.firestore();
+  const audio = document.getElementById("audioPlayer");
+  let isAudioEnabled = false;
+
+  function enableAudio() {
+    audio.play().then(() => audio.pause()).catch(() => {});
+    isAudioEnabled = true;
+    document.getElementById("btnInit").style.display = "none";
+    document.getElementById("statusText").innerText = "🟢 ระบบพร้อมรับคำสั่งเสียงแล้ว (เปิดทิ้งไว้ได้เลย)";
+  }
+
+  // ดึงคำสั่งจาก Firebase แบบ real-time
+  db.collection("sound_control").doc("current").onSnapshot((doc) => {
+    if (!doc.exists || !isAudioEnabled) return;
+    
+    const data = doc.data();
+    if (data.action === "PLAY") {
+      audio.src = data.url;
+      audio.play();
+      document.getElementById("nowPlaying").innerText = "🎶 กำลังเล่น: " + data.title;
+    } else if (data.action === "STOP") {
+      audio.pause();
+      audio.currentTime = 0;
+      document.getElementById("nowPlaying").innerText = "⏹️ หยุดเล่นเสียงแล้ว";
+    }
+  });
+</script>
+
+</body>
+</html>
