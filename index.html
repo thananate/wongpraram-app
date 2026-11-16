@@ -50,9 +50,9 @@
     <div class="time-row"><span>เข้า OT (H):</span> <b id="tH">--:--</b></div>
     <div class="time-row"><span>ออก OT (I):</span> <b id="tI">--:--</b></div>
     <div style="text-align: center; margin-top: 15px;">
-  <a href="admin.html" style="color: #6b7280; text-decoration: none; font-size: 13px;">🔑 สำหรับผู้ดูแลระบบ (Admin)</a>
+      <a href="admin.html" style="color: #6b7280; text-decoration: none; font-size: 13px;">🔑 สำหรับผู้ดูแลระบบ (Admin)</a>
     </div>
-    </div>
+  </div>
 </div>
 
 <script>
@@ -75,8 +75,15 @@
     localStorage.setItem("deviceId", deviceId);
   }
 
-  const todayStr = new Date().toISOString().split('T')[0];
+  // ใช้เวลาท้องถิ่น (Local Date) เพื่อป้องกันปัญหาวันที่คลาดเคลื่อนช่วง 00:00 - 07:00 น.
+  const localNow = new Date();
+  const todayStr = localNow.getFullYear() + "-" + 
+                   String(localNow.getMonth() + 1).padStart(2, '0') + "-" + 
+                   String(localNow.getDate()).padStart(2, '0');
   const docId = todayStr + "_" + deviceId;
+
+  // ตัวแปรเก็บข้อมูลล่าสุดของวันนี้จาก Firestore เพื่อใช้อ้างอิงและตรวจสอบการซ้ำ
+  let currentRecord = {};
 
   window.onload = function() {
     let lastName = localStorage.getItem("lastEmpName") || "";
@@ -84,14 +91,14 @@
 
     db.collection("attendance").doc(docId).onSnapshot(function(doc) {
       if (doc.exists) {
-        const data = doc.data();
-        if (data.empName) document.getElementById("empName").value = data.empName;
-        document.getElementById("tD").innerText = data.inMorning || "--:--";
-        document.getElementById("tE").innerText = data.outNoon || "--:--";
-        document.getElementById("tF").innerText = data.inAfternoon || "--:--";
-        document.getElementById("tG").innerText = data.outEvening || "--:--";
-        document.getElementById("tH").innerText = data.inOT || "--:--";
-        document.getElementById("tI").innerText = data.outOT || "--:--";
+        currentRecord = doc.data();
+        if (currentRecord.empName) document.getElementById("empName").value = currentRecord.empName;
+        document.getElementById("tD").innerText = currentRecord.inMorning || "--:--";
+        document.getElementById("tE").innerText = currentRecord.outNoon || "--:--";
+        document.getElementById("tF").innerText = currentRecord.inAfternoon || "--:--";
+        document.getElementById("tG").innerText = currentRecord.outEvening || "--:--";
+        document.getElementById("tH").innerText = currentRecord.inOT || "--:--";
+        document.getElementById("tI").innerText = currentRecord.outOT || "--:--";
       }
     });
   };
@@ -102,52 +109,79 @@
       alert("กรุณากรอกชื่อก่อนกดบันทึกครับ");
       return;
     }
+
+    const now = new Date();
+    const hour = now.getHours() + (now.getMinutes() / 60);
+
+    // 1. ตรวจสอบ Cooldown 3 นาที (กันกดรัวหรือกดปุ่มผิดสลับกันติดๆ)
+    if (currentRecord.lastActionMs) {
+      const diffMinutes = (now.getTime() - currentRecord.lastActionMs) / (1000 * 60);
+      if (diffMinutes < 3) {
+        const waitMins = Math.ceil(3 - diffMinutes);
+        alert("คุณเพิ่งทำรายการบันทึกเวลาไปเมื่อสักครู่ กรุณารออีกประมาณ " + waitMins + " นาทีครับ");
+        return;
+      }
+    }
+
+    // 2. ตรวจสอบว่าช่องเวลานั้นๆ เคยบันทึกไปแล้วหรือยัง
+    let targetField = "";
+    let slotName = "";
+
+    if (type === 'IN') {
+      if (hour < 12) { targetField = "inMorning"; slotName = "เข้าเช้า (D)"; }
+      else if (hour < 16) { targetField = "inAfternoon"; slotName = "เข้าบ่าย (F)"; }
+      else { targetField = "inOT"; slotName = "เข้า OT (H)"; }
+    } else {
+      if (hour < 13.5) { targetField = "outNoon"; slotName = "ออกเที่ยง (E)"; }
+      else if (hour < 18.5) { targetField = "outEvening"; slotName = "ออกบ่าย (G)"; }
+      else { targetField = "outOT"; slotName = "ออก OT (I)"; }
+    }
+
+    // ถ้ามีข้อมูลเวลาในช่องนั้นอยู่แล้ว ให้บล็อกและแจ้งเตือนทันที
+    if (currentRecord[targetField]) {
+      alert("ไม่สามารถบันทึกซ้ำได้ เนื่องจากคุณได้ลงเวลา \"" + slotName + "\" ไปแล้วเมื่อเวลา " + currentRecord[targetField] + " น.");
+      return;
+    }
+
     localStorage.setItem("lastEmpName", nameInput);
     toggleButtons(true);
 
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
-        function(pos) { doRecord(type, pos.coords.latitude, pos.coords.longitude); },
-        function(err) { doRecord(type, 0, 0); },
+        function(pos) { doRecord(targetField, slotName, pos.coords.latitude, pos.coords.longitude); },
+        function(err) { doRecord(targetField, slotName, 0, 0); },
         { timeout: 3000 }
       );
     } else {
-      doRecord(type, 0, 0);
+      doRecord(targetField, slotName, 0, 0);
     }
   }
 
-  function doRecord(type, lat, lng) {
+  function doRecord(targetField, slotName, lat, lng) {
     const name = document.getElementById("empName").value.trim();
     const now = new Date();
-    const hour = now.getHours() + (now.getMinutes() / 60);
-    const timeStr = now.toTimeString().substring(0, 5);
+    const timeStr = String(now.getHours()).padStart(2, '0') + ":" + String(now.getMinutes()).padStart(2, '0');
 
     let updateData = { 
       empName: name, 
       deviceId: deviceId, 
       date: todayStr,
+      lastActionMs: now.getTime(), // เก็บเวลาที่กดล่าสุดไว้เช็ก Cooldown
       updatedAt: firebase.firestore.FieldValue.serverTimestamp()
     };
+
+    // บันทึกเวลาลงเฉพาะช่องที่ตรวจสอบแล้วว่ายังว่างอยู่
+    updateData[targetField] = timeStr;
 
     if (lat !== 0 && lng !== 0) {
       updateData.lat = lat;
       updateData.lng = lng;
     }
 
-    if (type === 'IN') {
-      if (hour < 12) updateData.inMorning = timeStr;
-      else if (hour < 16) updateData.inAfternoon = timeStr;
-      else updateData.inOT = timeStr;
-    } else {
-      if (hour < 13.5) updateData.outNoon = timeStr;
-      else if (hour < 18.5) updateData.outEvening = timeStr;
-      else updateData.outOT = timeStr;
-    }
-
     db.collection("attendance").doc(docId).set(updateData, { merge: true })
       .then(function() {
         toggleButtons(false);
-        alert("บันทึกสำเร็จ!");
+        alert("บันทึก " + slotName + " เวลา " + timeStr + " น. สำเร็จ!");
       })
       .catch(function(err) {
         toggleButtons(false);
