@@ -12,31 +12,76 @@
   <style>
     * { box-sizing: border-box; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
     body { background-color: #f8fafc; padding: 20px; margin: 0; color: #334155; }
-    .container { max-width: 1200px; margin: 0 auto; }
-    .header { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); margin-bottom: 20px; }
+    .container { max-width: 1250px; margin: 0 auto; }
+    
+    /* Login Screen */
+    .login-box { max-width: 400px; margin: 90px auto; background: white; padding: 35px 30px; border-radius: 16px; box-shadow: 0 4px 20px rgba(0,0,0,0.08); text-align: center; }
+    .login-box h2 { color: #1e3a8a; margin: 0 0 10px 0; }
+    .login-input { width: 100%; padding: 12px; font-size: 18px; border: 1px solid #cbd5e1; border-radius: 8px; margin: 15px 0; text-align: center; letter-spacing: 2px; }
+    .btn-login { width: 100%; background: #2563eb; color: white; border: none; padding: 12px; font-size: 16px; font-weight: bold; border-radius: 8px; cursor: pointer; transition: 0.2s; }
+    .btn-login:hover { background: #1d4ed8; }
+
+    /* Header & Controls */
+    .header { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); margin-bottom: 20px; position: relative; }
     h2 { margin: 0 0 15px 0; color: #1e3a8a; text-align: center; }
     .filter-card { display: flex; gap: 15px; justify-content: center; align-items: center; background: #f1f5f9; padding: 15px; border-radius: 10px; margin-bottom: 15px; flex-wrap: wrap; }
     input[type="month"] { padding: 10px 14px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 15px; font-weight: bold; color: #1e293b; }
     .btn-export-month { background-color: #16a34a; color: white; border: none; padding: 10px 20px; font-size: 15px; font-weight: bold; border-radius: 8px; cursor: pointer; transition: 0.2s; }
     .btn-export-month:hover { background-color: #15803d; }
+    .btn-logout { background-color: #ef4444; color: white; border: none; padding: 10px 16px; font-size: 14px; font-weight: bold; border-radius: 8px; cursor: pointer; transition: 0.2s; }
+    .btn-logout:hover { background-color: #dc2626; }
+
+    /* Table */
     .table-responsive { background: white; border-radius: 12px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); overflow-x: auto; }
-    table { width: 100%; border-collapse: collapse; text-align: left; min-width: 900px; }
-    th, td { padding: 14px 16px; border-bottom: 1px solid #e2e8f0; font-size: 14px; }
+    table { width: 100%; border-collapse: collapse; text-align: left; min-width: 1000px; }
+    th, td { padding: 14px 14px; border-bottom: 1px solid #e2e8f0; font-size: 14px; }
     th { background-color: #f8fafc; color: #475569; font-weight: 600; white-space: nowrap; }
     tr:hover { background-color: #f1f5f9; }
-    .map-link { color: #2563eb; text-decoration: none; font-weight: bold; }
+    .map-link { color: #2563eb; text-decoration: none; font-weight: bold; white-space: nowrap; }
     .mode-title { font-weight: bold; color: #1e40af; text-align: center; font-size: 16px; margin-top: 5px; }
+    
+    /* Edit Button & Note Badge */
+    .btn-edit { background-color: #f59e0b; color: white; border: none; padding: 6px 12px; border-radius: 6px; font-weight: bold; font-size: 13px; cursor: pointer; white-space: nowrap; transition: 0.2s; }
+    .btn-edit:hover { background-color: #d97706; }
+    .note-badge { display: inline-block; background: #fef3c7; color: #b45309; font-size: 12px; padding: 2px 8px; border-radius: 4px; margin-top: 4px; font-weight: 500; }
+
+    /* Modal Popup */
+    .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(15, 23, 42, 0.6); z-index: 1000; justify-content: center; align-items: center; padding: 15px; }
+    .modal-box { background: white; width: 100%; max-width: 520px; border-radius: 14px; padding: 25px; box-shadow: 0 10px 30px rgba(0,0,0,0.25); max-height: 90vh; overflow-y: auto; }
+    .modal-box h3 { margin: 0 0 15px 0; color: #1e3a8a; border-bottom: 1px solid #e2e8f0; padding-bottom: 10px; }
+    .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px; }
+    .form-group { margin-bottom: 12px; }
+    .form-group label { display: block; font-size: 13px; font-weight: bold; color: #475569; margin-bottom: 4px; }
+    .form-group input, .form-group textarea { width: 100%; padding: 8px 10px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 14px; }
+    .time-input-wrap { display: flex; gap: 4px; }
+    .btn-clear-time { background: #e2e8f0; border: none; border-radius: 6px; padding: 0 8px; cursor: pointer; color: #475569; font-size: 12px; }
+    .btn-clear-time:hover { background: #cbd5e1; }
+    .modal-footer { display: flex; justify-content: flex-end; gap: 10px; margin-top: 15px; border-top: 1px solid #e2e8f0; padding-top: 15px; }
+    .btn-cancel { background: #e2e8f0; color: #334155; border: none; padding: 10px 18px; border-radius: 8px; font-weight: bold; cursor: pointer; }
+    .btn-save { background: #2563eb; color: white; border: none; padding: 10px 20px; border-radius: 8px; font-weight: bold; cursor: pointer; }
+    .btn-save:hover { background: #1d4ed8; }
   </style>
 </head>
 <body>
 
-<div class="container">
+<!-- หน้าจอล็อกอิน -->
+<div id="loginSection" class="login-box">
+  <h2>🔐 เข้าสู่ระบบ Admin</h2>
+  <p style="color: #64748b; font-size: 14px; margin: 0;">WONGPHRARAM DIGITAL</p>
+  <input type="password" id="adminPasswordInput" class="login-input" placeholder="กรอกรหัสผ่าน" onkeypress="if(event.key==='Enter') verifyLogin()">
+  <button class="btn-login" onclick="verifyLogin()">เข้าสู่ระบบ</button>
+  <div id="loginErrorMsg" style="color: #dc2626; font-size: 14px; margin-top: 12px; display: none;">❌ รหัสผ่านไม่ถูกต้อง กรุณาลองใหม่</div>
+</div>
+
+<!-- หน้าหลัก Dashboard -->
+<div id="dashboardSection" class="container" style="display: none;">
   <div class="header">
     <h2>📊 รายงานลงเวลาพนักงานประจำเดือน (Admin)</h2>
     <div class="filter-card">
       <label for="filterMonth"><b>เลือกเดือน/ปี:</b></label>
       <input type="month" id="filterMonth" onchange="renderMonthlyData()">
       <button class="btn-export-month" onclick="exportToExcel()">📥 ดาวน์โหลด Excel รายเดือน</button>
+      <button class="btn-logout" onclick="logoutAdmin()">ออกจากระบบ</button>
     </div>
     <div id="modeStatus" class="mode-title">กำลังโหลดข้อมูล...</div>
   </div>
@@ -54,12 +99,93 @@
           <th>เข้า OT (H)</th>
           <th>ออก OT (I)</th>
           <th>พิกัด GPS</th>
+          <th>จัดการ</th>
         </tr>
       </thead>
       <tbody id="tableBody">
-        <tr><td colspan="9" style="text-align:center; padding: 30px;">กำลังเชื่อมต่อระบบ...</td></tr>
+        <tr><td colspan="10" style="text-align:center; padding: 30px;">กำลังเชื่อมต่อระบบ...</td></tr>
       </tbody>
     </table>
+  </div>
+</div>
+
+<!-- หน้าต่างป๊อบอัปแก้ไขข้อมูล -->
+<div id="editModal" class="modal-overlay">
+  <div class="modal-box">
+    <h3>✏️ แก้ไขเวลาพนักงาน</h3>
+    <input type="hidden" id="editDocId">
+    
+    <div class="form-grid">
+      <div class="form-group">
+        <label>ชื่อพนักงาน</label>
+        <input type="text" id="editEmpName" readonly style="background: #f1f5f9; color: #64748b;">
+      </div>
+      <div class="form-group">
+        <label>วันที่</label>
+        <input type="date" id="editDate">
+      </div>
+    </div>
+
+    <div class="form-grid">
+      <div class="form-group">
+        <label>เข้าเช้า (D)</label>
+        <div class="time-input-wrap">
+          <input type="time" id="editInMorning">
+          <button type="button" class="btn-clear-time" onclick="document.getElementById('editInMorning').value=''" title="ล้างเวลา">ล้าง</button>
+        </div>
+      </div>
+      <div class="form-group">
+        <label>ออกเที่ยง (E)</label>
+        <div class="time-input-wrap">
+          <input type="time" id="editOutNoon">
+          <button type="button" class="btn-clear-time" onclick="document.getElementById('editOutNoon').value=''" title="ล้างเวลา">ล้าง</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="form-grid">
+      <div class="form-group">
+        <label>เข้าบ่าย (F)</label>
+        <div class="time-input-wrap">
+          <input type="time" id="editInAfternoon">
+          <button type="button" class="btn-clear-time" onclick="document.getElementById('editInAfternoon').value=''" title="ล้างเวลา">ล้าง</button>
+        </div>
+      </div>
+      <div class="form-group">
+        <label>ออกบ่าย (G)</label>
+        <div class="time-input-wrap">
+          <input type="time" id="editOutEvening">
+          <button type="button" class="btn-clear-time" onclick="document.getElementById('editOutEvening').value=''" title="ล้างเวลา">ล้าง</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="form-grid">
+      <div class="form-group">
+        <label>เข้า OT (H)</label>
+        <div class="time-input-wrap">
+          <input type="time" id="editInOT">
+          <button type="button" class="btn-clear-time" onclick="document.getElementById('editInOT').value=''" title="ล้างเวลา">ล้าง</button>
+        </div>
+      </div>
+      <div class="form-group">
+        <label>ออก OT (I)</label>
+        <div class="time-input-wrap">
+          <input type="time" id="editOutOT">
+          <button type="button" class="btn-clear-time" onclick="document.getElementById('editOutOT').value=''" title="ล้างเวลา">ล้าง</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label>หมายเหตุ (เช่น ลืมสแกนเข้า, ออกไปทำธุระข้างนอก)</label>
+      <textarea id="editNote" rows="2" placeholder="ระบุเหตุผลที่แก้ไขเวลา..."></textarea>
+    </div>
+
+    <div class="modal-footer">
+      <button class="btn-cancel" onclick="closeEditModal()">ยกเลิก</button>
+      <button class="btn-save" onclick="saveEditedRecord()">💾 บันทึกการแก้ไข</button>
+    </div>
   </div>
 </div>
 
@@ -76,27 +202,58 @@
   firebase.initializeApp(firebaseConfig);
   const db = firebase.firestore();
 
+  const PASSCODE = "0878061468";
   let allRawData = [];
   let currentFilteredData = [];
+  let isDataLoaded = false;
 
   window.onload = function() {
-    const today = new Date();
-    const year = today.getFullYear();
-    const month = String(today.getMonth() + 1).padStart(2, '0');
-    document.getElementById("filterMonth").value = `${year}-${month}`;
-
-    // ดึงข้อมูลทั้งหมดจาก Firebase
-    db.collection("attendance").onSnapshot((querySnapshot) => {
-      allRawData = [];
-      querySnapshot.forEach((doc) => {
-        allRawData.push(doc.data());
-      });
-      renderMonthlyData();
-    }, (err) => {
-      console.error(err);
-      document.getElementById("tableBody").innerHTML = `<tr><td colspan="9" style="text-align:center; color:red; padding: 30px;">⚠️ เกิดข้อผิดพลาดในการดึงข้อมูล: ${err.message}<br>กรุณาตรวจสอบสิทธิ์ Rules ใน Firebase Console</td></tr>`;
-    });
+    if (sessionStorage.getItem("wpr_admin_auth") === "true") {
+      unlockDashboard();
+    }
   };
+
+  function verifyLogin() {
+    const inputPass = document.getElementById("adminPasswordInput").value;
+    if (inputPass === PASSCODE) {
+      sessionStorage.setItem("wpr_admin_auth", "true");
+      document.getElementById("loginErrorMsg").style.display = "none";
+      unlockDashboard();
+    } else {
+      document.getElementById("loginErrorMsg").style.display = "block";
+    }
+  }
+
+  function logoutAdmin() {
+    sessionStorage.removeItem("wpr_admin_auth");
+    document.getElementById("dashboardSection").style.display = "none";
+    document.getElementById("loginSection").style.display = "block";
+    document.getElementById("adminPasswordInput").value = "";
+  }
+
+  function unlockDashboard() {
+    document.getElementById("loginSection").style.display = "none";
+    document.getElementById("dashboardSection").style.display = "block";
+
+    if (!isDataLoaded) {
+      isDataLoaded = true;
+      const today = new Date();
+      const year = today.getFullYear();
+      const month = String(today.getMonth() + 1).padStart(2, '0');
+      document.getElementById("filterMonth").value = `${year}-${month}`;
+
+      db.collection("attendance").onSnapshot((querySnapshot) => {
+        allRawData = [];
+        querySnapshot.forEach((doc) => {
+          allRawData.push({ id: doc.id, ...doc.data() });
+        });
+        renderMonthlyData();
+      }, (err) => {
+        console.error(err);
+        document.getElementById("tableBody").innerHTML = `<tr><td colspan="10" style="text-align:center; color:red; padding: 30px;">⚠️ เกิดข้อผิดพลาดในการดึงข้อมูล: ${err.message}</td></tr>`;
+      });
+    }
+  }
 
   function renderMonthlyData() {
     const selectedMonth = document.getElementById("filterMonth").value;
@@ -110,7 +267,7 @@
     tbody.innerHTML = "";
 
     if (currentFilteredData.length === 0) {
-      tbody.innerHTML = '<tr><td colspan="9" style="text-align:center; padding: 30px; color:#94a3b8;">ไม่พบข้อมูลการลงเวลาในเดือนนี้</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="10" style="text-align:center; padding: 30px; color:#94a3b8;">ไม่พบข้อมูลการลงเวลาในเดือนนี้</td></tr>';
       return;
     }
 
@@ -122,10 +279,12 @@
         mapHtml = `<a class="map-link" href="https://maps.google.com/?q=${data.lat},${data.lng}" target="_blank">📍 ดูแผนที่</a>`;
       }
 
+      const noteHtml = data.note ? `<br><span class="note-badge">📝 ${data.note}</span>` : "";
+
       const tr = document.createElement("tr");
       tr.innerHTML = `
         <td><b>${data.date || '-'}</b></td>
-        <td>${data.empName || '-'}</td>
+        <td>${data.empName || '-'}${noteHtml}</td>
         <td>${data.inMorning || '--:--'}</td>
         <td>${data.outNoon || '--:--'}</td>
         <td>${data.inAfternoon || '--:--'}</td>
@@ -133,9 +292,65 @@
         <td>${data.inOT || '--:--'}</td>
         <td>${data.outOT || '--:--'}</td>
         <td>${mapHtml}</td>
+        <td><button class="btn-edit" onclick="openEditModal('${data.id}')">✏️ Edit</button></td>
       `;
       tbody.appendChild(tr);
     });
+  }
+
+  function formatForTimeInput(val) {
+    if (!val || val === "--:--" || val === "-") return "";
+    return val.substring(0, 5); // ตัดให้เหลือ HH:MM สำหรับ input type="time"
+  }
+
+  function openEditModal(docId) {
+    const item = allRawData.find(d => d.id === docId);
+    if (!item) return;
+
+    document.getElementById("editDocId").value = item.id;
+    document.getElementById("editEmpName").value = item.empName || "";
+    document.getElementById("editDate").value = item.date || "";
+    document.getElementById("editInMorning").value = formatForTimeInput(item.inMorning);
+    document.getElementById("editOutNoon").value = formatForTimeInput(item.outNoon);
+    document.getElementById("editInAfternoon").value = formatForTimeInput(item.inAfternoon);
+    document.getElementById("editOutEvening").value = formatForTimeInput(item.outEvening);
+    document.getElementById("editInOT").value = formatForTimeInput(item.inOT);
+    document.getElementById("editOutOT").value = formatForTimeInput(item.outOT);
+    document.getElementById("editNote").value = item.note || "";
+
+    document.getElementById("editModal").style.display = "flex";
+  }
+
+  function closeEditModal() {
+    document.getElementById("editModal").style.display = "none";
+  }
+
+  async function saveEditedRecord() {
+    const docId = document.getElementById("editDocId").value;
+    const newDate = document.getElementById("editDate").value;
+    
+    if (!newDate) {
+      alert("กรุณาเลือกวันที่ให้ถูกต้องครับ");
+      return;
+    }
+
+    const updatedData = {
+      date: newDate,
+      inMorning: document.getElementById("editInMorning").value || "",
+      outNoon: document.getElementById("editOutNoon").value || "",
+      inAfternoon: document.getElementById("editInAfternoon").value || "",
+      outEvening: document.getElementById("editOutEvening").value || "",
+      inOT: document.getElementById("editInOT").value || "",
+      outOT: document.getElementById("editOutOT").value || "",
+      note: document.getElementById("editNote").value.trim()
+    };
+
+    try {
+      await db.collection("attendance").doc(docId).update(updatedData);
+      closeEditModal();
+    } catch (error) {
+      alert("❌ บันทึกข้อมูลไม่สำเร็จ: " + error.message);
+    }
   }
 
   function exportToExcel() {
@@ -156,6 +371,7 @@
       "ออกบ่าย (G)": item.outEvening || "--:--",
       "เข้า OT (H)": item.inOT || "--:--",
       "ออก OT (I)": item.outOT || "--:--",
+      "หมายเหตุ": item.note || "",
       "พิกัด GPS": item.mapUrl || (item.lat ? `https://maps.google.com/?q=${item.lat},${item.lng}` : "")
     }));
 
