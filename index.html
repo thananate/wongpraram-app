@@ -129,11 +129,11 @@
 
     if (type === 'IN') {
       if (hour < 12) { targetField = "inMorning"; slotName = "เข้าเช้า (D)"; }
-      else if (hour < 16) { targetField = "inAfternoon"; slotName = "เข้าบ่าย (F)"; }
+      else if (hour < 17.5) { targetField = "inAfternoon"; slotName = "เข้าบ่าย (F)"; }
       else { targetField = "inOT"; slotName = "เข้า OT (H)"; }
     } else {
       if (hour < 13.5) { targetField = "outNoon"; slotName = "ออกเที่ยง (E)"; }
-      else if (hour < 18.5) { targetField = "outEvening"; slotName = "ออกบ่าย (G)"; }
+      else if (hour < 17.5) { targetField = "outEvening"; slotName = "ออกบ่าย (G)"; }
       else { targetField = "outOT"; slotName = "ออก OT (I)"; }
     }
 
