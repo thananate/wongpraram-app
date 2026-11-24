@@ -56,6 +56,15 @@
 </div>
 
 <script>
+  // =========================================================================
+  // 📍 [ส่วนตั้งค่าพิกัดจุดอนุมัติ GPS] -> แก้ไขพิกัดและรัศมีได้ที่ 3 บรรทัดนี้ครับ
+  // =========================================================================
+  const OFFICE_LAT = 13.684995;   // ละติจูด (Latitude) ของจุดศูนย์กลาง
+  const OFFICE_LNG = 100.476894;  // ลองจิจูด (Longitude) ของจุดศูนย์กลาง
+  const MAX_DISTANCE_KM = 20;     // รัศมีที่อนุญาตให้กดลงเวลาได้ (หน่วย: กิโลเมตร) 
+                                  // *ตัวอย่าง: ถ้าอนาคตอยากลดเหลือ 500 เมตร ให้แก้เลข 20 เป็น 0.5
+  // =========================================================================
+
   const firebaseConfig = {
     apiKey: "AIzaSyActwKRKdMCIRo79apLXwwsw8zuHPCg9ag",
     authDomain: "wongpraram-v8.firebaseapp.com",
@@ -69,22 +78,23 @@
   firebase.initializeApp(firebaseConfig);
   const db = firebase.firestore();
 
+  // สร้างรหัสประจำเครื่อง (เก็บไว้ในเบราว์เซอร์) เพื่อแยกข้อมูลพนักงานแต่ละคน
   let deviceId = localStorage.getItem("deviceId");
   if (!deviceId) {
     deviceId = "DEV-" + Math.floor(Math.random() * 1000000);
     localStorage.setItem("deviceId", deviceId);
   }
 
-  // ใช้เวลาท้องถิ่น (Local Date) เพื่อป้องกันปัญหาวันที่คลาดเคลื่อนช่วง 00:00 - 07:00 น.
+  // สร้างชื่อเอกสารประจำวัน เช่น 2026-11-24_DEV-123456
   const localNow = new Date();
   const todayStr = localNow.getFullYear() + "-" + 
                    String(localNow.getMonth() + 1).padStart(2, '0') + "-" + 
                    String(localNow.getDate()).padStart(2, '0');
   const docId = todayStr + "_" + deviceId;
 
-  // ตัวแปรเก็บข้อมูลล่าสุดของวันนี้จาก Firestore เพื่อใช้อ้างอิงและตรวจสอบการซ้ำ
   let currentRecord = {};
 
+  // โหลดข้อมูลเดิมของวันนี้มาแสดงบนหน้าจอทันทีที่เปิดเว็บ
   window.onload = function() {
     let lastName = localStorage.getItem("lastEmpName") || "";
     if (lastName) document.getElementById("empName").value = lastName;
@@ -103,6 +113,22 @@
     });
   };
 
+  // =========================================================================
+  // 🧮 [ฟังก์ชันคำนวณระยะห่างระหว่าง 2 พิกัด] (สูตร Haversine) คืนค่าเป็น "กิโลเมตร"
+  // =========================================================================
+  function getDistanceInKm(lat1, lon1, lat2, lon2) {
+    const R = 6371; // รัศมีของโลก (กิโลเมตร)
+    const dLat = (lat2 - lat1) * (Math.PI / 180);
+    const dLon = (lon2 - lon1) * (Math.PI / 180);
+    const a = 
+      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos(lat1 * (Math.PI / 180)) * Math.cos(lat2 * (Math.PI / 180)) * 
+      Math.sin(dLon / 2) * Math.sin(dLon / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return R * c; // ผลลัพธ์ระยะทาง (กิโลเมตร)
+  }
+
+  // ฟังก์ชันหลักเมื่อพนักงานกดปุ่ม "บันทึกเข้างาน" หรือ "บันทึกออกงาน"
   function sendData(type) {
     var nameInput = document.getElementById("empName").value.trim();
     if (!nameInput) {
@@ -123,7 +149,7 @@
       }
     }
 
-    // 2. ตรวจสอบว่าช่องเวลานั้นๆ เคยบันทึกไปแล้วหรือยัง
+    // 2. กำหนดช่วงเวลา (ตัดเข้า OT ที่ 17.5 = 17:30 น.)
     let targetField = "";
     let slotName = "";
 
@@ -137,27 +163,53 @@
       else { targetField = "outOT"; slotName = "ออก OT (I)"; }
     }
 
-    // ถ้ามีข้อมูลเวลาในช่องนั้นอยู่แล้ว ให้บล็อกและแจ้งเตือนทันที
+    // 3. ป้องกันการลงเวลาซ้ำในช่องเดิม
     if (currentRecord[targetField]) {
       alert("ไม่สามารถบันทึกซ้ำได้ เนื่องจากคุณได้ลงเวลา \"" + slotName + "\" ไปแล้วเมื่อเวลา " + currentRecord[targetField] + " น.");
       return;
     }
 
     localStorage.setItem("lastEmpName", nameInput);
-    toggleButtons(true);
+    toggleButtons(true); // ล็อกปุ่มชั่วคราวระหว่างค้นหาพิกัด GPS
 
+    // 4. ตรวจสอบพิกัด GPS และเช็กระยะห่างจากจุดอนุมัติ
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
-        function(pos) { doRecord(targetField, slotName, pos.coords.latitude, pos.coords.longitude); },
-        function(err) { doRecord(targetField, slotName, 0, 0); },
-        { timeout: 3000 }
+        function(pos) {
+          const userLat = pos.coords.latitude;
+          const userLng = pos.coords.longitude;
+          
+          // คำนวณระยะห่างจากจุด OFFICE_LAT, OFFICE_LNG
+          const distance = getDistanceInKm(OFFICE_LAT, OFFICE_LNG, userLat, userLng);
+
+          // เช็กว่าเกินระยะ MAX_DISTANCE_KM (20 กม.) หรือไม่
+          if (distance > MAX_DISTANCE_KM) {
+            toggleButtons(false); // ปลดล็อกปุ่ม
+            alert("❌ คุณอยู่นอกพื้นที่ที่กำหนด!\nระยะห่างปัจจุบัน: " + distance.toFixed(2) + " กม. (อนุญาตไม่เกิน " + MAX_DISTANCE_KM + " กม.)");
+            return; // หยุดการทำงาน ไม่บันทึกลงฐานข้อมูล
+          }
+
+          // ถ้าอยู่ในระยะ 20 กม. -> ส่งข้อมูลไปบันทึกตามปกติ
+          doRecord(targetField, slotName, userLat, userLng, distance);
+        },
+        function(err) {
+          // กรณีพนักงานปิด GPS หรือกด "ไม่อนุญาต" เข้าถึงตำแหน่ง
+          toggleButtons(false);
+          alert("⚠️ ไม่สามารถดึงพิกัด GPS ได้\nกรุณาเปิด GPS (Location) และกดอนุญาตให้เว็บเข้าถึงตำแหน่งก่อนลงเวลาครับ");
+        },
+        { 
+          enableHighAccuracy: true, // ขอพิกัดความแม่นยำสูงจาก GPS มือถือ
+          timeout: 8000             // รอสัญญาณสูงสุด 8 วินาที
+        }
       );
     } else {
-      doRecord(targetField, slotName, 0, 0);
+      toggleButtons(false);
+      alert("⚠️ อุปกรณ์หรือเบราว์เซอร์ของคุณไม่รองรับการตรวจสอบพิกัด GPS");
     }
   }
 
-  function doRecord(targetField, slotName, lat, lng) {
+  // ฟังก์ชันบันทึกข้อมูลลง Firebase Firestore
+  function doRecord(targetField, slotName, lat, lng, distance) {
     const name = document.getElementById("empName").value.trim();
     const now = new Date();
     const timeStr = String(now.getHours()).padStart(2, '0') + ":" + String(now.getMinutes()).padStart(2, '0');
@@ -166,22 +218,19 @@
       empName: name, 
       deviceId: deviceId, 
       date: todayStr,
-      lastActionMs: now.getTime(), // เก็บเวลาที่กดล่าสุดไว้เช็ก Cooldown
+      lat: lat,
+      lng: lng,
+      distanceKm: Number(distance.toFixed(2)), // เก็บระยะห่าง (กม.) ไว้เป็นหลักฐานในฐานข้อมูลด้วย
+      lastActionMs: now.getTime(),
       updatedAt: firebase.firestore.FieldValue.serverTimestamp()
     };
 
-    // บันทึกเวลาลงเฉพาะช่องที่ตรวจสอบแล้วว่ายังว่างอยู่
     updateData[targetField] = timeStr;
-
-    if (lat !== 0 && lng !== 0) {
-      updateData.lat = lat;
-      updateData.lng = lng;
-    }
 
     db.collection("attendance").doc(docId).set(updateData, { merge: true })
       .then(function() {
         toggleButtons(false);
-        alert("บันทึก " + slotName + " เวลา " + timeStr + " น. สำเร็จ!");
+        alert("✅ บันทึก " + slotName + " เวลา " + timeStr + " น. สำเร็จ!\n(ห่างจากจุดอนุมัติ " + distance.toFixed(2) + " กม.)");
       })
       .catch(function(err) {
         toggleButtons(false);
@@ -189,6 +238,7 @@
       });
   }
 
+  // ฟังก์ชันเปิด/ปิดการใช้งานปุ่มกด
   function toggleButtons(disabled) {
     document.getElementById("btnIn").disabled = disabled;
     document.getElementById("btnOut").disabled = disabled;
